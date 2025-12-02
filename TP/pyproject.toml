@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 88
+# Règles activées : Pyflakes (F), Pycodestyle (E, W), Pydocstyle (D) pour la doc
+select = ["F", "E", "W", "D"]
+ignore = ["D100", "D104"] # Ignorer docstring manquant dans module/init pour simplifier
+
+[tool.ruff.pydocstyle]
+convention = "google"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
