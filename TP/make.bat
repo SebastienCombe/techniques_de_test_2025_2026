@@ -55,7 +55,7 @@ if "%1" == "lint" (
 
 if "%1" == "doc" (
     echo Generation de la documentation...
-    "%VENV_PYTHON%" -m pdoc3 --html --output-dir docs src/
+    "%VENV_PYTHON%" -m pdoc --html --output-dir docs src/
     goto end
 )
 

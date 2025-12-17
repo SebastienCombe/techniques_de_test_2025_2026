@@ -1,49 +1,63 @@
-from flask import Flask, request, Response
+from flask import Flask, Response
 import os
-from src.serializer import point_set_from_bytes, triangles_to_bytes
-import src.core as core
 import requests
+# On importe les modules entiers, c'est plus clair
+import src.serializer as serializer
+import src.core as core
 
 def create_app(test_config=None):
+    """Fonction factory pour créer l'app Flask."""
     app = Flask(__name__)
-    
-    # URL du PointSetManager (configurable via env)
+
+    # Récupération de l'URL du manager dans les variables d'env
     app.config['PSM_URL'] = os.environ.get('PSM_URL', 'http://point-set-manager:8080')
 
-    @app.route('/triangulation/<point_set_id>', methods=['GET'])
-    def get_triangulation(point_set_id):
-        # 1. Récupérer le PointSet auprès du PointSetManager
-        psm_url = app.config['PSM_URL']
+    @app.route('/triangulation/<id>', methods=['GET'])
+    def calcul_triangulation(id):
+        # Appel au service PointSetManager
+        # On construit l'URL avec des +
+        base_url = app.config['PSM_URL']
+        target_url = base_url + "/point_sets/" + id
+
         try:
-            resp = requests.get(f"{psm_url}/point_sets/{point_set_id}")
-        except requests.exceptions.RequestException:
+            r = requests.get(target_url)
+        except Exception as e:
+            # Si on arrive pas a joindre le serveur
+            print("Erreur connexion PSM: " + str(e))
             return "PointSetManager unavailable", 502
 
-        if resp.status_code == 404:
+        # Gestion des erreurs HTTP du manager
+        if r.status_code == 404:
             return "PointSet not found", 404
-        
-        if resp.status_code != 200:
+
+        if r.status_code != 200:
             return "Error from PointSetManager", 502
 
-        # 2. Désérialiser les points (Binaire -> Liste)
+        # Traitement des données
+        # Etape A : Deserialisation
         try:
-            points = point_set_from_bytes(resp.content)
+            points = serializer.point_set_from_bytes(r.content)
         except Exception:
+            # Si le format binaire n'est pas bon
             return "Invalid PointSet data", 500
 
-        # 3. Calculer la triangulation (Liste -> Liste)
+        # Etape B : Calcul de triangulation
         try:
             triangles = core.triangulate(points)
         except Exception:
+            # Si l'algo plante
             return "Triangulation failed", 500
 
-        # 4. Sérialiser le résultat (Liste -> Binaire)
-        result_bytes = triangles_to_bytes(points, triangles)
+        # Etape C : Serialisation du resultat
+        resultat_binaire = serializer.triangles_to_bytes(points, triangles)
 
-        return Response(result_bytes, mimetype='application/octet-stream', status=200)
+        # On renvoie la reponse avec le bon type MIME
+        return Response(resultat_binaire,
+        mimetype='application/octet-stream',
+        status=200)
 
     return app
 
-if __name__ == '__main__':
-    app = create_app()
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == '__main__':   # pragma: no cover
+    app = create_app()       # pragma: no cover
+    app.run(host='0.0.0.0', port=5000) # pragma: no cover
